@@ -1,8 +1,14 @@
 // store/index.ts
 import { create } from "zustand";
+import { notificationService } from "../services/notification.service";
+import { storageService } from "../services/storage.service";
 import { AppSettings, GroceryItem, Recipe, StorageItem } from "../types";
 
 interface AppStore {
+  // Data loaded state
+  isLoaded: boolean;
+  setIsLoaded: (loaded: boolean) => void;
+
   // Shopping List State
   shoppingList: GroceryItem[];
   addToShoppingList: (item: GroceryItem) => void;
@@ -33,52 +39,88 @@ interface AppStore {
   isListening: boolean;
   setIsListening: (listening: boolean) => void;
 
-  // Clear All Data
+  // Data Management
+  loadAllData: () => Promise<void>;
+  saveAllData: () => Promise<void>;
   clearAllData: () => void;
+
+  // Notifications
+  checkAndScheduleNotifications: () => Promise<void>;
 }
 
 export const useStore = create<AppStore>((set, get) => ({
+  // ==================== Data Loaded ====================
+  isLoaded: false,
+  setIsLoaded: (loaded) => set({ isLoaded: loaded }),
+
   // ==================== Shopping List ====================
   shoppingList: [],
 
-  addToShoppingList: (item) =>
+  addToShoppingList: (item) => {
     set((state) => ({
       shoppingList: [...state.shoppingList, item],
-    })),
+    }));
+    get().saveAllData();
+  },
 
-  removeFromShoppingList: (id) =>
+  removeFromShoppingList: (id) => {
     set((state) => ({
       shoppingList: state.shoppingList.filter((item) => item.id !== id),
-    })),
+    }));
+    get().saveAllData();
+  },
 
-  updateShoppingItem: (id, updates) =>
+  updateShoppingItem: (id, updates) => {
     set((state) => ({
       shoppingList: state.shoppingList.map((item) =>
         item.id === id ? { ...item, ...updates } : item
       ),
-    })),
+    }));
+    get().saveAllData();
+  },
 
-  clearShoppingList: () => set({ shoppingList: [] }),
+  clearShoppingList: () => {
+    set({ shoppingList: [] });
+    get().saveAllData();
+  },
 
   // ==================== Storage ====================
   storageItems: [],
 
-  addToStorage: (item) =>
+  addToStorage: (item) => {
     set((state) => ({
       storageItems: [...state.storageItems, item],
-    })),
+    }));
 
-  removeFromStorage: (id) =>
+    // Schedule notification for this item
+    if (item.expiryDate && get().settings.notificationsEnabled) {
+      notificationService.scheduleExpiryNotification(
+        item,
+        get().settings.expiryWarningDays
+      );
+    }
+
+    get().saveAllData();
+  },
+
+  removeFromStorage: (id) => {
+    // Cancel notifications for this item
+    notificationService.cancelNotificationsForItem(id);
+
     set((state) => ({
       storageItems: state.storageItems.filter((item) => item.id !== id),
-    })),
+    }));
+    get().saveAllData();
+  },
 
-  updateStorageItem: (id, updates) =>
+  updateStorageItem: (id, updates) => {
     set((state) => ({
       storageItems: state.storageItems.map((item) =>
         item.id === id ? { ...item, ...updates } : item
       ),
-    })),
+    }));
+    get().saveAllData();
+  },
 
   moveToStorage: (shoppingItemId, expiryDate) => {
     const state = get();
@@ -89,11 +131,11 @@ export const useStore = create<AppStore>((set, get) => ({
     if (shoppingItem) {
       const storageItem: StorageItem = {
         ...shoppingItem,
-        id: shoppingItemId, // Keep same ID
+        id: shoppingItemId,
         isPurchased: true,
         purchasedAt: new Date(),
         expiryDate: expiryDate || undefined,
-        location: "pantry", // Default location
+        location: "pantry",
       };
 
       state.addToStorage(storageItem);
@@ -101,7 +143,11 @@ export const useStore = create<AppStore>((set, get) => ({
     }
   },
 
-  clearStorage: () => set({ storageItems: [] }),
+  clearStorage: () => {
+    notificationService.cancelAllNotifications();
+    set({ storageItems: [] });
+    get().saveAllData();
+  },
 
   // ==================== Recipes ====================
   recipes: [],
@@ -109,9 +155,15 @@ export const useStore = create<AppStore>((set, get) => ({
 
   setCurrentRecipe: (recipe) => set({ currentRecipe: recipe }),
 
-  setRecipes: (recipes) => set({ recipes }),
+  setRecipes: (recipes) => {
+    set({ recipes });
+    get().saveAllData();
+  },
 
-  clearRecipes: () => set({ recipes: [], currentRecipe: null }),
+  clearRecipes: () => {
+    set({ recipes: [], currentRecipe: null });
+    get().saveAllData();
+  },
 
   // ==================== Settings ====================
   settings: {
@@ -121,22 +173,88 @@ export const useStore = create<AppStore>((set, get) => ({
     theme: "light",
   },
 
-  updateSettings: (updates) =>
+  updateSettings: (updates) => {
     set((state) => ({
       settings: { ...state.settings, ...updates },
-    })),
+    }));
+
+    // If notifications were enabled, check and schedule
+    if (updates.notificationsEnabled) {
+      get().checkAndScheduleNotifications();
+    }
+    // If notifications were disabled, cancel all
+    else if (updates.notificationsEnabled === false) {
+      notificationService.cancelAllNotifications();
+    }
+  },
 
   // ==================== Voice ====================
   isListening: false,
-
   setIsListening: (listening) => set({ isListening: listening }),
 
-  // ==================== Clear All ====================
-  clearAllData: () =>
+  // ==================== Data Management ====================
+  loadAllData: async () => {
+    try {
+      const [shoppingList, storageItems, recipes] = await Promise.all([
+        storageService.loadShoppingList(),
+        storageService.loadStorageItems(),
+        storageService.loadRecipes(),
+      ]);
+
+      set({
+        shoppingList,
+        storageItems,
+        recipes,
+        isLoaded: true,
+      });
+
+      // Check and schedule notifications after loading
+      get().checkAndScheduleNotifications();
+    } catch (error) {
+      console.error("Failed to load data:", error);
+      set({ isLoaded: true });
+    }
+  },
+
+  saveAllData: async () => {
+    try {
+      const state = get();
+      await Promise.all([
+        storageService.saveShoppingList(state.shoppingList),
+        storageService.saveStorageItems(state.storageItems),
+        storageService.saveRecipes(state.recipes),
+      ]);
+    } catch (error) {
+      console.error("Failed to save data:", error);
+    }
+  },
+
+  clearAllData: () => {
+    notificationService.cancelAllNotifications();
+    storageService.clearAllData();
     set({
       shoppingList: [],
       storageItems: [],
       recipes: [],
       currentRecipe: null,
-    }),
+    });
+  },
+
+  // ==================== Notifications ====================
+  checkAndScheduleNotifications: async () => {
+    const state = get();
+
+    if (!state.settings.notificationsEnabled) return;
+
+    try {
+      await notificationService.checkExpiringItems(
+        state.storageItems,
+        state.settings.expiryWarningDays
+      );
+
+      await storageService.saveLastNotificationCheck(new Date());
+    } catch (error) {
+      console.error("Failed to check notifications:", error);
+    }
+  },
 }));

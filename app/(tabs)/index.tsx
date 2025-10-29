@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { COMMON_ITEMS } from "../../constants/commonItems";
 import { useVoiceCommands } from "../../hooks/useVoiceCommands";
 import { useStore } from "../../store";
@@ -108,177 +109,185 @@ export default function ShoppingListScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.inputContainer}>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={[styles.input, styles.nameInput]}
-            placeholder="Item name"
-            value={itemName}
-            onChangeText={setItemName}
-            onSubmitEditing={handleAddItem}
-          />
-          <TextInput
-            style={[styles.input, styles.quantityInput]}
-            placeholder="Qty"
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="numeric"
-          />
-        </View>
-        <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
-          <Ionicons name="add-circle" size={24} color="#fff" />
-          <Text style={styles.addButtonText}>Add Item</Text>
-        </TouchableOpacity>
-      </View>
-
-      {shoppingList.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="cart-outline" size={80} color="#ddd" />
-          <Text style={styles.emptyText}>Your shopping list is empty</Text>
-          <Text style={styles.emptySubtext}>Add items to get started</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={shoppingList}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-        />
-      )}
-
-      {/* Voice button - now functional! */}
-      <TouchableOpacity
-        style={[styles.voiceButton, isListening && styles.voiceButtonActive]}
-        onPress={isListening ? stopListening : startListening}
-      >
-        <Ionicons
-          name={isListening ? "stop" : "mic-outline"}
-          size={28}
-          color="#fff"
-        />
-        {isListening && (
-          <View style={styles.listeningIndicator}>
-            <View style={styles.pulse} />
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
+      <View style={styles.content}>
+        <View style={styles.inputContainer}>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={[styles.input, styles.nameInput]}
+              placeholder="Item name"
+              value={itemName}
+              onChangeText={setItemName}
+              onSubmitEditing={handleAddItem}
+            />
+            <TextInput
+              style={[styles.input, styles.quantityInput]}
+              placeholder="Qty"
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+            />
           </View>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
+            <Ionicons name="add-circle" size={24} color="#fff" />
+            <Text style={styles.addButtonText}>Add Item</Text>
+          </TouchableOpacity>
+        </View>
+
+        {shoppingList.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cart-outline" size={80} color="#ddd" />
+            <Text style={styles.emptyText}>Your shopping list is empty</Text>
+            <Text style={styles.emptySubtext}>Add items to get started</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={shoppingList}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+          />
         )}
-      </TouchableOpacity>
 
-      {/* Expiry Date Modal */}
-      <Modal
-        visible={showExpiryModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowExpiryModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Set Expiry Date</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowExpiryModal(false);
-                  setSelectedItem(null);
-                  setCustomDays("");
-                }}
-              >
-                <Ionicons name="close" size={28} color="#666" />
-              </TouchableOpacity>
+        {/* Voice button - now functional! */}
+        <TouchableOpacity
+          style={[styles.voiceButton, isListening && styles.voiceButtonActive]}
+          onPress={isListening ? stopListening : startListening}
+        >
+          <Ionicons
+            name={isListening ? "stop" : "mic-outline"}
+            size={28}
+            color="#fff"
+          />
+          {isListening && (
+            <View style={styles.listeningIndicator}>
+              <View style={styles.pulse} />
             </View>
+          )}
+        </TouchableOpacity>
 
-            {selectedItem && (
-              <>
-                <Text style={styles.itemNameModal}>{selectedItem.name}</Text>
-
-                {/* AI Suggested Expiry */}
-                {(() => {
-                  const suggestedDays = getSuggestedExpiryDays(
-                    selectedItem.name
-                  );
-                  const suggestedDate = addDays(new Date(), suggestedDays);
-                  return (
-                    <TouchableOpacity
-                      style={styles.suggestionCard}
-                      onPress={() => handleMoveToStorage(suggestedDays)}
-                    >
-                      <View style={styles.suggestionIcon}>
-                        <Ionicons name="sparkles" size={24} color="#4CAF50" />
-                      </View>
-                      <View style={styles.suggestionText}>
-                        <Text style={styles.suggestionLabel}>AI Suggested</Text>
-                        <Text style={styles.suggestionDate}>
-                          {format(suggestedDate, "MMM dd, yyyy")} (
-                          {suggestedDays} days)
-                        </Text>
-                      </View>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={24}
-                        color="#4CAF50"
-                      />
-                    </TouchableOpacity>
-                  );
-                })()}
-
-                {/* Quick Options */}
-                <Text style={styles.sectionTitle}>Quick Options</Text>
-                <View style={styles.quickOptionsGrid}>
-                  {[
-                    { days: 1, label: "Tomorrow" },
-                    { days: 3, label: "3 Days" },
-                    { days: 7, label: "1 Week" },
-                    { days: 14, label: "2 Weeks" },
-                    { days: 30, label: "1 Month" },
-                    { days: 90, label: "3 Months" },
-                  ].map((option) => (
-                    <TouchableOpacity
-                      key={option.days}
-                      style={styles.quickOption}
-                      onPress={() => handleMoveToStorage(option.days)}
-                    >
-                      <Text style={styles.quickOptionText}>{option.label}</Text>
-                      <Text style={styles.quickOptionDays}>{option.days}d</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Custom Days Input */}
-                <Text style={styles.sectionTitle}>Custom</Text>
-                <View style={styles.customInputRow}>
-                  <TextInput
-                    style={styles.customInput}
-                    placeholder="Enter days"
-                    value={customDays}
-                    onChangeText={setCustomDays}
-                    keyboardType="numeric"
-                  />
-                  <TouchableOpacity
-                    style={styles.customButton}
-                    onPress={handleCustomExpiry}
-                  >
-                    <Text style={styles.customButtonText}>Set</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* No Expiry Option */}
+        {/* Expiry Date Modal */}
+        <Modal
+          visible={showExpiryModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowExpiryModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Set Expiry Date</Text>
                 <TouchableOpacity
-                  style={styles.noExpiryButton}
                   onPress={() => {
-                    if (selectedItem) {
-                      moveToStorage(selectedItem.id);
-                      setShowExpiryModal(false);
-                      setSelectedItem(null);
-                    }
+                    setShowExpiryModal(false);
+                    setSelectedItem(null);
+                    setCustomDays("");
                   }}
                 >
-                  <Text style={styles.noExpiryText}>No Expiry Date</Text>
+                  <Ionicons name="close" size={28} color="#666" />
                 </TouchableOpacity>
-              </>
-            )}
+              </View>
+
+              {selectedItem && (
+                <>
+                  <Text style={styles.itemNameModal}>{selectedItem.name}</Text>
+
+                  {/* AI Suggested Expiry */}
+                  {(() => {
+                    const suggestedDays = getSuggestedExpiryDays(
+                      selectedItem.name
+                    );
+                    const suggestedDate = addDays(new Date(), suggestedDays);
+                    return (
+                      <TouchableOpacity
+                        style={styles.suggestionCard}
+                        onPress={() => handleMoveToStorage(suggestedDays)}
+                      >
+                        <View style={styles.suggestionIcon}>
+                          <Ionicons name="sparkles" size={24} color="#4CAF50" />
+                        </View>
+                        <View style={styles.suggestionText}>
+                          <Text style={styles.suggestionLabel}>
+                            AI Suggested
+                          </Text>
+                          <Text style={styles.suggestionDate}>
+                            {format(suggestedDate, "MMM dd, yyyy")} (
+                            {suggestedDays} days)
+                          </Text>
+                        </View>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={24}
+                          color="#4CAF50"
+                        />
+                      </TouchableOpacity>
+                    );
+                  })()}
+
+                  {/* Quick Options */}
+                  <Text style={styles.sectionTitle}>Quick Options</Text>
+                  <View style={styles.quickOptionsGrid}>
+                    {[
+                      { days: 1, label: "Tomorrow" },
+                      { days: 3, label: "3 Days" },
+                      { days: 7, label: "1 Week" },
+                      { days: 14, label: "2 Weeks" },
+                      { days: 30, label: "1 Month" },
+                      { days: 90, label: "3 Months" },
+                    ].map((option) => (
+                      <TouchableOpacity
+                        key={option.days}
+                        style={styles.quickOption}
+                        onPress={() => handleMoveToStorage(option.days)}
+                      >
+                        <Text style={styles.quickOptionText}>
+                          {option.label}
+                        </Text>
+                        <Text style={styles.quickOptionDays}>
+                          {option.days}d
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Custom Days Input */}
+                  <Text style={styles.sectionTitle}>Custom</Text>
+                  <View style={styles.customInputRow}>
+                    <TextInput
+                      style={styles.customInput}
+                      placeholder="Enter days"
+                      value={customDays}
+                      onChangeText={setCustomDays}
+                      keyboardType="numeric"
+                    />
+                    <TouchableOpacity
+                      style={styles.customButton}
+                      onPress={handleCustomExpiry}
+                    >
+                      <Text style={styles.customButtonText}>Set</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* No Expiry Option */}
+                  <TouchableOpacity
+                    style={styles.noExpiryButton}
+                    onPress={() => {
+                      if (selectedItem) {
+                        moveToStorage(selectedItem.id);
+                        setShowExpiryModal(false);
+                        setSelectedItem(null);
+                      }
+                    }}
+                  >
+                    <Text style={styles.noExpiryText}>No Expiry Date</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -286,6 +295,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
+  },
+  content: {
+    flex: 1,
   },
   inputContainer: {
     backgroundColor: "#fff",

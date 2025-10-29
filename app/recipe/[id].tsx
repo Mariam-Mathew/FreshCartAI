@@ -1,34 +1,39 @@
 // app/recipe/[id].tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useStore } from "../../store";
 
 export default function RecipeDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const currentRecipe = useStore((state: any) => state.currentRecipe);
+  const params = useLocalSearchParams();
+  const id = typeof params.id === "string" ? params.id : params.id?.[0];
+
+  const recipes = useStore((state) => state.recipes);
+  const setCurrentRecipe = useStore((state) => state.setCurrentRecipe);
+
   const [currentStep, setCurrentStep] = useState(0);
   const [isCookingMode, setIsCookingMode] = useState(false);
 
-  if (!currentRecipe) {
-    return (
-      <View style={styles.container}>
-        <Text>Recipe not found</Text>
-      </View>
-    );
-  }
+  // Find recipe by ID
+  const recipe = recipes.find((r) => r.id === id);
+
+  useEffect(() => {
+    if (recipe) {
+      setCurrentRecipe(recipe);
+    }
+  }, [recipe, setCurrentRecipe]);
 
   const handleNextStep = () => {
-    if (currentStep < currentRecipe.instructions.length - 1) {
+    if (recipe && currentStep < recipe.instructions.length - 1) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -39,8 +44,35 @@ export default function RecipeDetailScreen() {
     }
   };
 
+  if (!recipe) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={28} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Recipe</Text>
+          <View style={{ width: 28 }} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={80} color="#ddd" />
+          <Text style={styles.errorText}>Recipe not found</Text>
+          <TouchableOpacity
+            style={styles.backToRecipesButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backToRecipesText}>Back to Recipes</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -55,32 +87,30 @@ export default function RecipeDetailScreen() {
       {!isCookingMode ? (
         <ScrollView style={styles.content}>
           <View style={styles.titleSection}>
-            <Text style={styles.title}>{currentRecipe.title}</Text>
-            <Text style={styles.description}>{currentRecipe.description}</Text>
+            <Text style={styles.title}>{recipe.title}</Text>
+            <Text style={styles.description}>{recipe.description}</Text>
           </View>
 
           <View style={styles.infoRow}>
-            {currentRecipe.prepTime && (
+            {recipe.prepTime !== undefined && recipe.cookTime !== undefined && (
               <View style={styles.infoItem}>
                 <Ionicons name="time-outline" size={20} color="#4CAF50" />
                 <Text style={styles.infoText}>
-                  {currentRecipe.prepTime + (currentRecipe.cookTime || 0)} min
+                  {recipe.prepTime + recipe.cookTime} min
                 </Text>
               </View>
             )}
-            {currentRecipe.servings && (
+            {recipe.servings !== undefined && (
               <View style={styles.infoItem}>
                 <Ionicons name="people-outline" size={20} color="#4CAF50" />
-                <Text style={styles.infoText}>
-                  {currentRecipe.servings} servings
-                </Text>
+                <Text style={styles.infoText}>{recipe.servings} servings</Text>
               </View>
             )}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Ingredients</Text>
-            {currentRecipe.ingredients.map((ingredient: any, index: any) => (
+            {recipe.ingredients.map((ingredient, index) => (
               <View key={index} style={styles.ingredientItem}>
                 <Ionicons
                   name="checkmark-circle-outline"
@@ -94,7 +124,7 @@ export default function RecipeDetailScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Instructions</Text>
-            {currentRecipe.instructions.map((instruction: any, index: any) => (
+            {recipe.instructions.map((instruction, index) => (
               <View key={index} style={styles.instructionItem}>
                 <View style={styles.stepNumber}>
                   <Text style={styles.stepNumberText}>{index + 1}</Text>
@@ -115,7 +145,7 @@ export default function RecipeDetailScreen() {
       ) : (
         <View style={styles.cookingModeContainer}>
           <View style={styles.cookingHeader}>
-            <Text style={styles.cookingTitle}>{currentRecipe.title}</Text>
+            <Text style={styles.cookingTitle}>{recipe.title}</Text>
             <TouchableOpacity
               onPress={() => setIsCookingMode(false)}
               style={styles.exitCookingButton}
@@ -126,7 +156,7 @@ export default function RecipeDetailScreen() {
 
           <View style={styles.stepCounter}>
             <Text style={styles.stepCounterText}>
-              Step {currentStep + 1} of {currentRecipe.instructions.length}
+              Step {currentStep + 1} of {recipe.instructions.length}
             </Text>
           </View>
 
@@ -136,7 +166,7 @@ export default function RecipeDetailScreen() {
             </View>
             <ScrollView style={styles.stepTextContainer}>
               <Text style={styles.stepText}>
-                {currentRecipe.instructions[currentStep]}
+                {recipe.instructions[currentStep]}
               </Text>
             </ScrollView>
           </View>
@@ -165,17 +195,17 @@ export default function RecipeDetailScreen() {
             <TouchableOpacity
               style={[
                 styles.controlButton,
-                currentStep === currentRecipe.instructions.length - 1 &&
+                currentStep === recipe.instructions.length - 1 &&
                   styles.controlButtonDisabled,
               ]}
               onPress={handleNextStep}
-              disabled={currentStep === currentRecipe.instructions.length - 1}
+              disabled={currentStep === recipe.instructions.length - 1}
             >
               <Ionicons
                 name="chevron-forward"
                 size={32}
                 color={
-                  currentStep === currentRecipe.instructions.length - 1
+                  currentStep === recipe.instructions.length - 1
                     ? "#ccc"
                     : "#4CAF50"
                 }
@@ -183,7 +213,7 @@ export default function RecipeDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {currentStep === currentRecipe.instructions.length - 1 && (
+          {currentStep === recipe.instructions.length - 1 && (
             <TouchableOpacity
               style={styles.completeButton}
               onPress={() => {
@@ -213,6 +243,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
+    backgroundColor: "#fff",
   },
   backButton: {
     padding: 4,
@@ -221,6 +252,30 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#333",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  errorText: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#999",
+    marginTop: 16,
+  },
+  backToRecipesButton: {
+    marginTop: 24,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  backToRecipesText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   content: {
     flex: 1,

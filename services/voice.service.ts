@@ -1,5 +1,4 @@
 // services/voice.service.ts
-import { Audio } from "expo-av";
 import * as Speech from "expo-speech";
 
 export interface VoiceRecognitionResult {
@@ -8,9 +7,6 @@ export interface VoiceRecognitionResult {
 }
 
 export class VoiceService {
-  private recording: Audio.Recording | null = null;
-  private isRecording = false;
-
   // Text-to-Speech
   async speak(
     text: string,
@@ -49,76 +45,6 @@ export class VoiceService {
       console.error("Check speaking error:", error);
       return false;
     }
-  }
-
-  // Initialize audio permissions
-  async requestPermissions(): Promise<boolean> {
-    try {
-      const { status } = await Audio.requestPermissionsAsync();
-      return status === "granted";
-    } catch (error) {
-      console.error("Permission error:", error);
-      return false;
-    }
-  }
-
-  // Start recording (for speech-to-text)
-  async startRecording(): Promise<void> {
-    try {
-      const hasPermission = await this.requestPermissions();
-      if (!hasPermission) {
-        throw new Error("Microphone permission not granted");
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-
-      this.recording = recording;
-      this.isRecording = true;
-    } catch (error) {
-      console.error("Start recording error:", error);
-      throw error;
-    }
-  }
-
-  // Stop recording
-  async stopRecording(): Promise<string | null> {
-    try {
-      if (!this.recording || !this.isRecording) {
-        return null;
-      }
-
-      await this.recording.stopAndUnloadAsync();
-      const uri = this.recording.getURI();
-      this.recording = null;
-      this.isRecording = false;
-
-      return uri;
-    } catch (error) {
-      console.error("Stop recording error:", error);
-      throw error;
-    }
-  }
-
-  // Get recording status
-  getIsRecording(): boolean {
-    return this.isRecording;
-  }
-
-  // Mock speech recognition (will be replaced with real API in production)
-  async recognizeSpeech(audioUri: string): Promise<VoiceRecognitionResult> {
-    // In production, you would send this to a speech recognition API
-    // For now, we'll use a mock response
-    return {
-      transcript: "add milk to shopping list",
-      confidence: 0.95,
-    };
   }
 
   // Parse voice command

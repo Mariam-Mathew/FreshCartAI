@@ -1,15 +1,19 @@
 // app/(tabs)/recipes.tsx
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { aiService } from "../../services/ai.service";
 import { useStore } from "../../store";
 import { Recipe } from "../../types";
 
@@ -18,57 +22,64 @@ export default function RecipesScreen() {
   const router = useRouter();
   const recipes = useStore((state) => state.recipes);
   const storageItems = useStore((state) => state.storageItems);
-  const setRecipes = useStore((state) => state.setRecipes);
+  const setRecipes: any = useStore((state) => state.setRecipes);
   const setCurrentRecipe = useStore((state) => state.setCurrentRecipe);
 
   const handleFindRecipes = async () => {
     if (storageItems.length === 0) {
-      alert("Add items to storage first!");
+      Alert.alert(
+        "No Items",
+        "Add items to storage first to get recipe suggestions!"
+      );
       return;
     }
 
-    setLoading(true);
+    // Check if API key is configured
+    try {
+      const savedKey = await AsyncStorage.getItem("@groq_api_key");
+      if (!savedKey) {
+        Alert.alert(
+          "AI Not Configured",
+          "Please add your Groq API key in Settings to use AI recipe suggestions.",
+          [{ text: "OK", style: "cancel" }]
+        );
+        return;
+      }
 
-    // Placeholder - will be replaced with AI integration
-    setTimeout(() => {
-      const mockRecipes: Recipe[] = [
-        {
-          id: "1",
-          title: "Simple Pasta",
-          description: "Quick and easy pasta dish",
-          ingredients: ["pasta", "tomato", "olive oil", "garlic"],
-          instructions: [
-            "Boil water and cook pasta according to package directions",
-            "Heat olive oil in a pan and sauté minced garlic",
-            "Add chopped tomatoes and cook for 5 minutes",
-            "Toss cooked pasta with the sauce",
-            "Serve hot with cheese if desired",
-          ],
-          prepTime: 10,
-          cookTime: 15,
-          servings: 2,
-        },
-        {
-          id: "2",
-          title: "Chicken Stir Fry",
-          description: "Healthy and delicious stir fry",
-          ingredients: ["chicken", "vegetables", "soy sauce", "rice"],
-          instructions: [
-            "Cut chicken into bite-sized pieces",
-            "Heat oil in a wok or large pan",
-            "Cook chicken until golden brown",
-            "Add vegetables and stir fry for 5 minutes",
-            "Add soy sauce and serve over rice",
-          ],
-          prepTime: 15,
-          cookTime: 10,
-          servings: 4,
-        },
-      ];
+      setLoading(true);
 
-      setRecipes(mockRecipes);
+      // Make sure API key is set
+      aiService.setApiKey(savedKey);
+
+      // Get ingredient names from storage
+      const ingredients = storageItems.map((item) => item.name);
+
+      console.log("Finding recipes for:", ingredients);
+
+      // Call AI service
+      const aiRecipes = await aiService.suggestRecipes(ingredients);
+
+      console.log("Got recipes:", aiRecipes.length);
+
+      setRecipes(aiRecipes);
+
+      if (aiRecipes.length > 0) {
+        Alert.alert("Success", `Found ${aiRecipes.length} recipes for you!`);
+      } else {
+        Alert.alert(
+          "No Recipes",
+          "Could not generate recipes. Please try again."
+        );
+      }
+    } catch (error: any) {
+      console.error("Error finding recipes:", error);
+      Alert.alert(
+        "Error",
+        `Failed to get recipe suggestions: ${error.message || "Unknown error"}`
+      );
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   const handleRecipePress = (recipe: Recipe) => {
@@ -92,15 +103,15 @@ export default function RecipesScreen() {
       </Text>
 
       <View style={styles.recipeInfo}>
-        {item.prepTime && (
+        {item.prepTime !== undefined && item.cookTime !== undefined && (
           <View style={styles.infoItem}>
             <Ionicons name="time-outline" size={16} color="#666" />
             <Text style={styles.infoText}>
-              {item.prepTime + item.cookTime!} min
+              {item.prepTime + item.cookTime} min
             </Text>
           </View>
         )}
-        {item.servings && (
+        {item.servings !== undefined && (
           <View style={styles.infoItem}>
             <Ionicons name="people-outline" size={16} color="#666" />
             <Text style={styles.infoText}>{item.servings} servings</Text>
@@ -119,7 +130,7 @@ export default function RecipesScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
       <View style={styles.headerContainer}>
         <Text style={styles.headerText}>
           {storageItems.length > 0
@@ -166,7 +177,7 @@ export default function RecipesScreen() {
       <TouchableOpacity style={styles.voiceButton}>
         <Ionicons name="mic-outline" size={28} color="#fff" />
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -17,50 +17,45 @@ export const useVoiceCommands = () => {
       return;
     }
 
-    try {
-      setIsListening(true);
+    setIsListening(true);
 
-      // Show commands prompt
-      Alert.alert("Voice Command Demo", "Choose a command to test:", [
-        {
-          text: "Add Milk",
-          onPress: async () => {
-            setTranscript("add milk to shopping list");
-            await executeCommand({ action: "add_to_shopping", item: "milk" });
-            setIsListening(false);
-          },
-        },
-        {
-          text: "Add 2 Eggs",
-          onPress: async () => {
-            setTranscript("add 2 eggs to shopping list");
-            await executeCommand({
-              action: "add_to_shopping",
-              item: "eggs",
-              quantity: 2,
-            });
-            setIsListening(false);
-          },
-        },
-        {
-          text: "Add Bread",
-          onPress: async () => {
-            setTranscript("add bread to shopping list");
-            await executeCommand({ action: "add_to_shopping", item: "bread" });
-            setIsListening(false);
-          },
-        },
+    // Simulate voice input with text prompt
+    Alert.prompt(
+      "🎤 Voice Command",
+      'Speak or type your command:\n\nExamples:\n• "Add milk to shopping list"\n• "Add 2 eggs to shopping list"\n• "Find recipes"',
+      [
         {
           text: "Cancel",
           style: "cancel",
           onPress: () => setIsListening(false),
         },
-      ]);
-    } catch (error) {
-      console.error("Start listening error:", error);
-      Alert.alert("Error", "Failed to start voice recognition");
-      setIsListening(false);
-    }
+        {
+          text: "Submit",
+          onPress: async (inputText) => {
+            if (inputText && inputText.trim()) {
+              setTranscript(inputText);
+              const command = voiceService.parseCommand(inputText);
+
+              if (command) {
+                await executeCommand(command);
+              } else {
+                await voiceService.speak(
+                  "Sorry, I did not understand that command"
+                );
+                Alert.alert(
+                  "Unknown Command",
+                  "Try commands like:\n• Add [item] to shopping list\n• Find recipes"
+                );
+              }
+            }
+            setIsListening(false);
+          },
+        },
+      ],
+      "plain-text",
+      "",
+      "default"
+    );
   }, [voiceEnabled]);
 
   const stopListening = useCallback(async () => {
@@ -82,13 +77,22 @@ export const useVoiceCommands = () => {
               await voiceService.speak(
                 `Added ${command.item} to shopping list`
               );
-              Alert.alert("Success", `Added ${command.item} to shopping list`);
+              Alert.alert(
+                "Success!",
+                `Added ${command.item}${
+                  command.quantity ? ` (${command.quantity})` : ""
+                } to shopping list`
+              );
             }
             break;
 
           case "find_recipes":
             await voiceService.speak(
               "Finding recipes based on your ingredients"
+            );
+            Alert.alert(
+              "Recipe Search",
+              'Go to Recipes tab and click "Find Recipes"'
             );
             break;
 
