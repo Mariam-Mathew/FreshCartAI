@@ -7,6 +7,7 @@ import { useStore } from "../store";
 export const useVoiceCommands = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [showModal, setShowModal] = useState(false);
 
   const voiceEnabled = useStore((state) => state.settings.voiceEnabled);
   const addToShoppingList = useStore((state) => state.addToShoppingList);
@@ -18,47 +19,30 @@ export const useVoiceCommands = () => {
     }
 
     setIsListening(true);
-
-    // Simulate voice input with text prompt
-    Alert.prompt(
-      "🎤 Voice Command",
-      'Speak or type your command:\n\nExamples:\n• "Add milk to shopping list"\n• "Add 2 eggs to shopping list"\n• "Find recipes"',
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-          onPress: () => setIsListening(false),
-        },
-        {
-          text: "Submit",
-          onPress: async (inputText) => {
-            if (inputText && inputText.trim()) {
-              setTranscript(inputText);
-              const command = voiceService.parseCommand(inputText);
-
-              if (command) {
-                await executeCommand(command);
-              } else {
-                await voiceService.speak(
-                  "Sorry, I did not understand that command"
-                );
-                Alert.alert(
-                  "Unknown Command",
-                  "Try commands like:\n• Add [item] to shopping list\n• Find recipes"
-                );
-              }
-            }
-            setIsListening(false);
-          },
-        },
-      ],
-      "plain-text",
-      "",
-      "default"
-    );
+    setShowModal(true);
   }, [voiceEnabled]);
 
   const stopListening = useCallback(async () => {
+    setIsListening(false);
+    setShowModal(false);
+  }, []);
+
+  const handleVoiceInput = useCallback(async (inputText: string) => {
+    setTranscript(inputText);
+    setShowModal(false);
+
+    const command = voiceService.parseCommand(inputText);
+
+    if (command) {
+      await executeCommand(command);
+    } else {
+      await voiceService.speak("Sorry, I did not understand that command");
+      Alert.alert(
+        "Unknown Command",
+        "Try commands like:\n• Add [item] to shopping list\n• Find recipes"
+      );
+    }
+
     setIsListening(false);
   }, []);
 
@@ -129,8 +113,10 @@ export const useVoiceCommands = () => {
   return {
     isListening,
     transcript,
+    showModal,
     startListening,
     stopListening,
+    handleVoiceInput,
     speak,
   };
 };

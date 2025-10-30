@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { addDays, format } from "date-fns";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Modal,
@@ -15,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COMMON_ITEMS } from "../../constants/commonItems";
 import { useVoiceCommands } from "../../hooks/useVoiceCommands";
+import { aiService } from "../../services/ai.service";
 import { useStore } from "../../store";
 import { GroceryItem } from "../../types";
 
@@ -24,6 +26,8 @@ export default function ShoppingListScreen() {
   const [showExpiryModal, setShowExpiryModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<GroceryItem | null>(null);
   const [customDays, setCustomDays] = useState("");
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [aiSuggestedDays, setAiSuggestedDays] = useState<number | null>(null);
 
   const shoppingList = useStore((state) => state.shoppingList);
   const addToShoppingList = useStore((state) => state.addToShoppingList);
@@ -52,16 +56,36 @@ export default function ShoppingListScreen() {
     setQuantity("");
   };
 
-  const handlePurchase = (item: GroceryItem) => {
+  const handlePurchase = async (item: GroceryItem) => {
     setSelectedItem(item);
     setShowExpiryModal(true);
+    setAiSuggestedDays(null);
+
+    // Try to get AI suggestion if configured
+    if (aiService.isConfigured()) {
+      setLoadingAI(true);
+      try {
+        const days = await aiService.suggestExpiryDate(item.name);
+        setAiSuggestedDays(days);
+      } catch (error) {
+        console.error("AI suggestion failed:", error);
+      } finally {
+        setLoadingAI(false);
+      }
+    }
   };
 
   const getSuggestedExpiryDays = (itemName: string): number => {
+    // Use AI suggestion if available
+    if (aiSuggestedDays) {
+      return aiSuggestedDays;
+    }
+
+    // Fallback to common items database
     const commonItem = COMMON_ITEMS.find(
       (item) => item.name.toLowerCase() === itemName.toLowerCase()
     );
-    return commonItem?.defaultExpiryDays || 7; // Default 7 days if not found
+    return commonItem?.defaultExpiryDays || 7;
   };
 
   const handleMoveToStorage = (days: number) => {
@@ -202,24 +226,41 @@ export default function ShoppingListScreen() {
                       <TouchableOpacity
                         style={styles.suggestionCard}
                         onPress={() => handleMoveToStorage(suggestedDays)}
+                        disabled={loadingAI}
                       >
                         <View style={styles.suggestionIcon}>
-                          <Ionicons name="sparkles" size={24} color="#4CAF50" />
+                          {loadingAI ? (
+                            <ActivityIndicator size="small" color="#4CAF50" />
+                          ) : (
+                            <Ionicons
+                              name="sparkles"
+                              size={24}
+                              color="#4CAF50"
+                            />
+                          )}
                         </View>
                         <View style={styles.suggestionText}>
                           <Text style={styles.suggestionLabel}>
-                            AI Suggested
+                            {loadingAI
+                              ? "AI is thinking..."
+                              : aiSuggestedDays
+                              ? "AI Suggested"
+                              : "Suggested"}
                           </Text>
-                          <Text style={styles.suggestionDate}>
-                            {format(suggestedDate, "MMM dd, yyyy")} (
-                            {suggestedDays} days)
-                          </Text>
+                          {!loadingAI && (
+                            <Text style={styles.suggestionDate}>
+                              {format(suggestedDate, "MMM dd, yyyy")} (
+                              {suggestedDays} days)
+                            </Text>
+                          )}
                         </View>
-                        <Ionicons
-                          name="chevron-forward"
-                          size={24}
-                          color="#4CAF50"
-                        />
+                        {!loadingAI && (
+                          <Ionicons
+                            name="chevron-forward"
+                            size={24}
+                            color="#4CAF50"
+                          />
+                        )}
                       </TouchableOpacity>
                     );
                   })()}

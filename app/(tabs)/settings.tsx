@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { aiService } from "../../services/ai.service";
+import { notificationService } from "../../services/notification.service";
+import { storageService } from "../../services/storage.service";
 import { useStore } from "../../store";
 
 const API_KEY_STORAGE = "@groq_api_key";
@@ -74,6 +76,81 @@ export default function SettingsScreen() {
 
   const handleOpenGroqConsole = () => {
     Linking.openURL("https://console.groq.com/keys");
+  };
+
+  const handleTestNotification = async () => {
+    const hasPermission = await notificationService.requestPermissions();
+    if (!hasPermission) {
+      Alert.alert(
+        "Permission Denied",
+        "Please enable notifications in your device settings"
+      );
+      return;
+    }
+
+    await notificationService.sendTestNotification();
+    Alert.alert("Test Sent", "Check your notifications!");
+  };
+
+  const handleCheckExpiring = async () => {
+    await useStore.getState().checkAndScheduleNotifications();
+    Alert.alert(
+      "Notifications Scheduled",
+      "You will be notified about expiring items"
+    );
+  };
+
+  const handleExportData = async () => {
+    try {
+      const jsonData = await storageService.exportData();
+
+      // Create alert with the data
+      Alert.alert(
+        "Export Data",
+        "Your data has been exported. Copy the text below:",
+        [
+          {
+            text: "Copy to Clipboard",
+            onPress: async () => {
+              // For now, just show instructions
+              Alert.alert(
+                "Export Instructions",
+                `Data size: ${(jsonData.length / 1024).toFixed(2)} KB\n\n` +
+                  "To export:\n" +
+                  "1. Copy this data from console\n" +
+                  "2. Save to a file\n" +
+                  "3. Import later if needed\n\n" +
+                  "Check console for full data.",
+                [{ text: "OK" }]
+              );
+              console.log("=== EXPORTED DATA ===");
+              console.log(jsonData);
+              console.log("=== END EXPORT ===");
+            },
+          },
+          {
+            text: "View Summary",
+            onPress: () => {
+              const parsed = JSON.parse(jsonData);
+              Alert.alert(
+                "Export Summary",
+                `Shopping List: ${parsed.data.shoppingList.length} items\n` +
+                  `Storage: ${parsed.data.storageItems.length} items\n` +
+                  `Recipes: ${parsed.data.recipes.length} items\n\n` +
+                  `Export Date: ${new Date(
+                    parsed.exportDate
+                  ).toLocaleString()}\n` +
+                  `Version: ${parsed.version}`
+              );
+            },
+          },
+          { text: "Cancel", style: "cancel" },
+        ]
+      );
+    } catch (error: any) {
+      console.error("Export failed:", error);
+      Alert.alert("Error", `Failed to export data: ${error.message}`);
+    }
   };
 
   const handleClearData = () => {
@@ -194,6 +271,22 @@ export default function SettingsScreen() {
               </View>
             </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleTestNotification}
+          >
+            <Ionicons name="notifications-outline" size={20} color="#4CAF50" />
+            <Text style={styles.actionButtonText}>Test Notification</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleCheckExpiring}
+          >
+            <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+            <Text style={styles.actionButtonText}>Check Expiring Items</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -242,6 +335,14 @@ export default function SettingsScreen() {
           >
             <Ionicons name="trash-outline" size={20} color="#fff" />
             <Text style={styles.dangerButtonText}>Clear All Data</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleExportData}
+          >
+            <Ionicons name="download-outline" size={20} color="#4CAF50" />
+            <Text style={styles.actionButtonText}>Export Data</Text>
           </TouchableOpacity>
         </View>
 
@@ -423,6 +524,23 @@ const styles = StyleSheet.create({
   },
   dangerButtonText: {
     color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  actionButton: {
+    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 14,
+    borderRadius: 8,
+    gap: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  actionButtonText: {
+    color: "#4CAF50",
     fontSize: 16,
     fontWeight: "600",
   },

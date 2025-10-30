@@ -24,7 +24,8 @@
         "android.permission.NOTIFICATIONS"
       ],
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.mariam22.FreshCartAI"
     },
     "web": {
       "output": "static",
@@ -43,11 +44,18 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-speech-recognition"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "884c9415-bea4-44fa-84c6-96fcd3a9f339"
+      }
     }
   }
 }
