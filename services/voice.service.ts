@@ -56,14 +56,20 @@ export class VoiceService {
   } | null {
     const lowerTranscript = transcript.toLowerCase().trim();
 
-    // Add to shopping list
-    if (
-      lowerTranscript.includes("add") &&
-      lowerTranscript.includes("shopping")
-    ) {
-      const match = lowerTranscript.match(/add\s+(.+?)\s+to\s+shopping/i);
+    // Add to shopping list - more flexible patterns
+    if (lowerTranscript.includes("add")) {
+      // Pattern: "add milk to shopping list"
+      let match = lowerTranscript.match(
+        /add\s+(.+?)\s+to\s+(?:shopping\s+)?(?:list|cart)/i
+      );
+
+      // Pattern: "add milk"
+      if (!match) {
+        match = lowerTranscript.match(/add\s+(.+?)(?:\s+to|$)/i);
+      }
+
       if (match) {
-        const itemText = match[1];
+        const itemText = match[1].trim();
         const qtyMatch = itemText.match(/(\d+)\s+(.+)/);
 
         if (qtyMatch) {

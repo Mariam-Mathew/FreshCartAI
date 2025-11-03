@@ -36,7 +36,8 @@ export default function ShoppingListScreen() {
   );
   const moveToStorage = useStore((state) => state.moveToStorage);
 
-  const { isListening, startListening, stopListening } = useVoiceCommands();
+  const { isListening, transcript, startListening, stopListening } =
+    useVoiceCommands();
 
   const handleAddItem = () => {
     if (!itemName.trim()) {
@@ -173,7 +174,7 @@ export default function ShoppingListScreen() {
           />
         )}
 
-        {/* Voice button - now functional! */}
+        {/* Voice button with real speech recognition */}
         <TouchableOpacity
           style={[styles.voiceButton, isListening && styles.voiceButtonActive]}
           onPress={isListening ? stopListening : startListening}
@@ -189,6 +190,16 @@ export default function ShoppingListScreen() {
             </View>
           )}
         </TouchableOpacity>
+
+        {/* Listening indicator */}
+        {isListening && (
+          <View style={styles.listeningBanner}>
+            <View style={styles.listeningDot} />
+            <Text style={styles.listeningText}>
+              {transcript || "Listening... Speak now!"}
+            </Text>
+          </View>
+        )}
 
         {/* Expiry Date Modal */}
         <Modal
@@ -468,6 +479,35 @@ const styles = StyleSheet.create({
     height: 70,
     borderRadius: 35,
     backgroundColor: "rgba(244, 67, 54, 0.3)",
+  },
+  listeningBanner: {
+    position: "absolute",
+    bottom: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  listeningDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#f44336",
+  },
+  listeningText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
   },
   modalOverlay: {
     flex: 1,

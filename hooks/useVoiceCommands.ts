@@ -7,7 +7,7 @@ import { useStore } from "../store";
 export const useVoiceCommands = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [showModal, setShowModal] = useState(false);
+  const [showInputModal, setShowInputModal] = useState(false);
 
   const voiceEnabled = useStore((state) => state.settings.voiceEnabled);
   const addToShoppingList = useStore((state) => state.addToShoppingList);
@@ -19,17 +19,20 @@ export const useVoiceCommands = () => {
     }
 
     setIsListening(true);
-    setShowModal(true);
+    setShowInputModal(true);
+    setTranscript("");
   }, [voiceEnabled]);
 
   const stopListening = useCallback(async () => {
     setIsListening(false);
-    setShowModal(false);
+    setShowInputModal(false);
+    setTranscript("");
   }, []);
 
   const handleVoiceInput = useCallback(async (inputText: string) => {
     setTranscript(inputText);
-    setShowModal(false);
+    setShowInputModal(false);
+    setIsListening(false);
 
     const command = voiceService.parseCommand(inputText);
 
@@ -38,12 +41,10 @@ export const useVoiceCommands = () => {
     } else {
       await voiceService.speak("Sorry, I did not understand that command");
       Alert.alert(
-        "Unknown Command",
-        "Try commands like:\n• Add [item] to shopping list\n• Find recipes"
+        "Command Not Recognized",
+        `I heard: "${inputText}"\n\nTry:\n• "Add milk to shopping list"\n• "Add 2 eggs to shopping list"`
       );
     }
-
-    setIsListening(false);
   }, []);
 
   const executeCommand = useCallback(
@@ -62,10 +63,10 @@ export const useVoiceCommands = () => {
                 `Added ${command.item} to shopping list`
               );
               Alert.alert(
-                "Success!",
-                `Added ${command.item}${
+                "✓ Added!",
+                `${command.item}${
                   command.quantity ? ` (${command.quantity})` : ""
-                } to shopping list`
+                } added to shopping list`
               );
             }
             break;
@@ -113,7 +114,7 @@ export const useVoiceCommands = () => {
   return {
     isListening,
     transcript,
-    showModal,
+    showInputModal,
     startListening,
     stopListening,
     handleVoiceInput,
